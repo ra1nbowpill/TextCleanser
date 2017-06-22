@@ -16,3 +16,4 @@ LATTICE_TOOL_DIR="/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/srilm-1.6.0
 LM_DIR="/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/TextCleanser/data/"
 
 $LATTICE_TOOL_DIR/ngram -lm "$LM_DIR/tweet-lm.gz" -mix-lm "$LM_DIR/latimes-lm.gz" -lambda 0.7 -mix-lambda2 0.3 -server-port "$SERVER_PORT" &
+echo "$!"
