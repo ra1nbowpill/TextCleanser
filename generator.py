@@ -533,7 +533,6 @@ class Generator:
             # get candidates for each word
             confusion_set = [self.word_generate_candidates(nw.lower(), rank_method, off_by_ones)
                              for nw in words]
-            print(confusion_set)
 
         return replacements, words, confusion_set
 

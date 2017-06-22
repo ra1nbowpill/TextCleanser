@@ -112,7 +112,7 @@ class Decoder:
         if self.ngram_server_process is None:
             return
         self.ngram_server_process.kill()
-        print("closing ngram server")
+        sys.stderr.write("closing ngram server\n")
         self.is_running = False
 
     def close(self):
@@ -164,14 +164,11 @@ class Decoder:
 
             stdout = stdout.decode('UTF-8')
             stderr = stderr.decode('UTF-8')
-            print("Sortie decoddeur")
-            print(stdout)
-            print(stderr)
             # if sentence initial marker '<s>' not found, indicates something went wrong
             # during decoding
             if stdout.find("<s>") == -1:
-                print("Decoder error output: {}".format(stdout))
-                print("word_mesh: {}".format(word_mesh))
+                sys.stderr.write("Decoder error output: {}\n".format(stdout))
+                sys.stderr.write("word_mesh: {}\n".format(word_mesh))
                 return "", "ERROR"
 
             # strip out the sentence
