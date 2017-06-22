@@ -14,6 +14,8 @@ LM_DIR = "/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/TextCleanser/data/"
 
 EMPTY_SYM = "EMPTYSYM"   # placeholder for empty symbol
 
+TEXTCLEANSER_ROOT = os.path.split(os.path.realpath(__file__))[0] + os.sep
+
 
 class Decoder:
     """
@@ -26,23 +28,19 @@ class Decoder:
         so start_ngram_server() has become obsolete, although it might be a better way..
         """
 
-        if port is None:
-            self.port = "12345"
-        else:
-            self.port = port
-
-        if ip is None:
-            self.ip = "127.0.0.1"
-        else:
-            self.ip = ip
+        self.port = "12345" if port is None else port
+        self.ip = "127.0.0.1" if ip is None else ip
 
         self.ngram_server_address = "{}@{}".format(self.port, self.ip)
-        self.ngram_server_pid = None
+        self.ngram_server_process = None
 
         self.is_running = False
 
         self.decode_command = [LATTICE_TOOL_DIR + "lattice-tool", "-in-lattice", "-", "-read-mesh", "-posterior-decode",
                                "-zeroprob-word", "blemish", "-use-server", self.ngram_server_address]
+        self.start_server_command = [LATTICE_TOOL_DIR + "ngram", "-lm", LM_DIR + "tweet-lm.gz", "-mix-lm",
+                                     LM_DIR + "latimes-lm.gz", "-lambda", "0.7", "-mix-lambda2", "0.3",
+                                     "-server-port", self.port]
 
         # check for presence of "lattice-tool"
         assert (os.path.exists(LATTICE_TOOL_DIR + "lattice-tool"))
@@ -53,8 +51,6 @@ class Decoder:
         self.start_ngram_server()
 
     def ngram_server_is_running(self):
-
-        is_running = False
 
         p = subprocess.Popen(self.decode_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -67,9 +63,10 @@ class Decoder:
                 is_running = True
         else:
             is_running = True
-        p.kill()
-        return is_running
 
+        p.kill()
+
+        return is_running
 
     def start_ngram_server(self):
         if self.ngram_server_is_running():
@@ -79,48 +76,42 @@ class Decoder:
 
         sys.stderr.write("Launching ngram server at {}\n".format(self.ngram_server_address))
 
-        textcleanser_root = os.path.split(os.path.realpath(__file__))[0] + os.sep
-        command = [textcleanser_root + "start_ngram_server.sh", self.port]
-
-        p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(self.start_server_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.ngram_server_process = p
 
         launched = False
-
         i = 0
 
         def timeout(x):
-            return 120 if x < 2 else 1
+            return 120 if x < 1 else 1
 
         while True:
-            r, _, _ = select.select([p.stderr, p.stdout], [], [], timeout(i))
+            r, _, _ = select.select([p.stderr], [], [], timeout(i))
             i += 1
             if p.stderr in r:
                 line = p.stderr.readline().decode('UTF-8').strip()
                 if line == "starting prob server on port {}".format(self.port):
                     launched = True
                 elif line == "could not bind socket: Address already in use":
-                    # The server was already launched so the pid is not the goog one
-                    self.ngram_server_pid = None
+                    # The server was already launched so the pid is not the good one
+                    self.ngram_server_process = None
+                    launched = True
                 elif "error" in line:
                     launched = False
-            elif p.stdout in r:
-                # start_ngram_server.sh outputs the PID of the ngram server process on stdout
-                line = p.stdout.readline().decode('UTF-8').strip()
-                self.ngram_server_pid = line
             else:
                 break
 
         self.is_running = launched
         if self.is_running:
-            sys.stderr.write("SUCCESS : ngram server launched (pid: {})\n".format(self.ngram_server_pid))
+            sys.stderr.write("SUCCESS : ngram server launched (pid: {})\n".format(self.ngram_server_process))
         else:
             sys.stderr.write("ERROR : Failed to launch ngram server")
         return self.is_running
 
     def stop_ngram_server(self):
-        if self.ngram_server_pid is None:
+        if self.ngram_server_process is None:
             return
-        subprocess.Popen(["kill", self.ngram_server_pid])
+        self.ngram_server_process.kill()
         print("closing ngram server")
         self.is_running = False
 
@@ -136,11 +127,17 @@ class Decoder:
             return None, "Server not running"
 
         try:
-            p = subprocess.Popen(self.decode_command, shell=True, stdin=subprocess.PIPE,
+            p = subprocess.Popen(" ".join(self.decode_command), shell=True, stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, stderr = p.communicate(word_mesh.encode('UTF-8'))
+            stdout, stderr = p.communicate(input=word_mesh.encode('UTF-8'))
+
+            p.kill()
 
             stdout = stdout.decode('UTF-8')
+            stderr = stderr.decode('UTF-8')
+            print("Sortie decoddeur")
+            print(stdout)
+            print(stderr)
             # if sentence initial marker '<s>' not found, indicates something went wrong
             # during decoding
             if stdout.find("<s>") == -1:
@@ -154,19 +151,12 @@ class Decoder:
             clean_sent = clean_sent.replace(EMPTY_SYM, '')
 
             # if 'SOMENAME' still present in string, it also indicates something went wrong..
-            # NB: 'find' returns starting index of matching substring in str, -1 if not found
             # if clean_sent.find("SOMENAME")!=-1:
             # error
             #   print("Second error.")
             #   print("Decoder error output: {}".format(stdout))
             #   print("word_mesh: ".format(word_mesh))
             #   return "", "ERROR"
-
-            # workaround for bug where p (and its associated pipes) do not
-            # seem to be terminated/closed properly
-            os.system("killall lattice-tool > /dev/null 2>&1")
-            # another possible solution
-            # os.close(p.fileno())
 
             return clean_sent, stderr
 
