@@ -9,7 +9,6 @@
 
 import collections
 import itertools
-import sys
 import heapq
 import time
 import math
@@ -18,11 +17,8 @@ import string
 import csv
 from phonetic_algorithms import PhoneticAlgorithms
 from string_functions import StringFunctions
-PY3 = sys.version_info.major == 3
-if PY3:
-    import pickle as cPickle
-else:
-    import cPickle
+import pickle as pickle
+
 
 # constants
 LEXICON_FILENAME = "data/combined_lex.pickl"
@@ -30,10 +26,7 @@ PHON_LEX_FILENAME = "data/phonetic_lex.pickl"
 PHONE_LEX_KEYS_FILENAME = "data/phonetic_lex_keys.pickl"
 SUB_LEX_FILENAME = "data/sub_lexicon.pickl"
 # set(nltk.corpus.stopwords.words())
-if PY3:
-    STOPWORDS = cPickle.load(open("data/stopwords-set.pickl", "rb"), encoding="UTF-8")
-else:
-    STOPWORDS = cPickle.load(open("data/stopwords-set.pickl", "rb"))
+STOPWORDS = pickle.load(open("data/stopwords-set.pickl", "rb"), encoding="UTF-8")
 ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 CONSONANTS = "bcdfghjklmnpqrstvwxyz"
 PUNC = string.punctuation
@@ -52,25 +45,28 @@ class Generator:
 
     def __init__(self, lexicon=None):
 
-        # load the lexicon from a pickled dump
-        # we use the Top20K words in gigaword intersected with CMU
-        # pronunciation dictionary, adapt this to your needs
-        self.lexicon = cPickle.load(open(LEXICON_FILENAME, 'rb'))
+        if lexicon is None:
+            # load the lexicon from a pickled dump
+            # we use the Top20K words in gigaword intersected with CMU
+            # pronunciation dictionary, adapt this to your needs
+            self.lexicon = pickle.load(open(LEXICON_FILENAME, 'rb'))
+        else:
+            self.lexicon = lexicon
 
         # load the phonetically indexed lexicon
         try:
-            self.phon_lex = cPickle.load(open(PHON_LEX_FILENAME, 'rb'))
+            self.phon_lex = pickle.load(open(PHON_LEX_FILENAME, 'rb'))
             # print("Loaded phonetically indexed lexicon with {} partitions.".format(len(self.phon_lex.keys())))
         except IOError:
             # build phonetic lexicon
             self.phon_lex = self.build_phonetic_index()
-            cPickle.dump(self.phon_lex, open(PHON_LEX_FILENAME, 'wb'))
+            pickle.dump(self.phon_lex, open(PHON_LEX_FILENAME, 'wb'))
         # load the list of phonetic keys
         self.phonetic_keys = self.phon_lex.keys()
 
         # load lexicon sub-indexed by first consonant
         try:
-            self.sub_lexicon = cPickle.load(open(SUB_LEX_FILENAME, 'rb'))
+            self.sub_lexicon = pickle.load(open(SUB_LEX_FILENAME, 'rb'))
             # print("Loaded sub-indexed lexicon with {} partitions.".format(len(self.sub_lexicon.keys())))
         except IOError:
             # build sub-lexicon
@@ -79,7 +75,7 @@ class Generator:
             #    if len(w) <= 1:
             #        del w
             self.sub_lexicon = self.build_sub_index()
-            cPickle.dump(self.sub_lexicon, open(SUB_LEX_FILENAME, 'wb'))
+            pickle.dump(self.sub_lexicon, open(SUB_LEX_FILENAME, 'wb'))
 
         # load list of common abbreviations, adapt common_abbrs.csv to your own
         # needs
@@ -118,7 +114,7 @@ class Generator:
         # smiley regex
         self.smiley_regex = re.compile(
             "[:;]-?[DP()\\\|bpoO0]{1,2}")     # recognise emoticons
-        self.lt_gt_regex = re.compile("\&[lr]t;[\d]?")
+        self.lt_gt_regex = re.compile("&[lr]t;[\d]?")
         # pnc = ''.join(l for l in [string.punctuation]) + " \t"  # remove double punctuation and spaces
         # regexes for detecting usernames, hashtags, rt's and urls at the token
         # level
@@ -130,7 +126,7 @@ class Generator:
         # where users did not put a space between the end of sentence and next
         # word
         self.urls = re.compile(
-            "((https?://)+([-\w]+\.[-\w\.]+)+\w(:\d+)?(/([-\w/_\.]*(\?\S+)?)?)*)")
+            "((https?://)+([-\w]+\.[-\w.]+)+\w(:\d+)?(/([-\w/_.]*(\?\S+)?)?)*)")
         # self.sim_cache = shelve.open('sim_cache')
 
     def build_phonetic_index(self):
@@ -139,7 +135,7 @@ class Generator:
         print("Building phonetic index over {} words.".format(len(self.lexicon)))
         t1 = time.time()
         phon_lex = collections.defaultdict(list)
-        dbl_metaphone = PhoneticAlgorithms().doubleMetaphone
+        dbl_metaphone = PhoneticAlgorithms().double_metaphone
         for w in self.lexicon:
             m = dbl_metaphone(w)
             phon_lex[m[0]].append(w)
@@ -159,14 +155,14 @@ class Generator:
 
     # @profile
     def lcs_len1(self, xs, ys):
-        '''
+        """
         from: http://wordaligned.org/articles/longest-common-subsequence
         Return the length of the LCS of xs and ys.
 
         Example:
         >>> lcs_length("HUMAN", "CHIMPANZEE")
         4
-        '''
+        """
         ny = len(ys)
         curr = list(itertools.repeat(0, 1 + ny))
         for x in xs:
@@ -180,9 +176,9 @@ class Generator:
 
     # @profile
     def lcs_len2(self, X, Y):
-        '''
+        """
             http://en.wikibooks.org/wiki/Algorithm_implementation/Strings/Longest_common_subsequence#Computing_the_length_of_the_LCS
-        '''
+        """
         m = len(X)
         n = len(Y)
 
@@ -198,9 +194,9 @@ class Generator:
 
     # @profile
     def cs(self, s):
-        '''
+        """
             generates the consonant skeleton of a word, 'shop' -> 'shp'
-        '''
+        """
         return ''.join([l for l in s.lower() if l not in 'aeiou'])
 
     # @profile
@@ -226,16 +222,16 @@ class Generator:
 
     # @profile
     def lcs_ratio(self, word1, word2):
-        '''
+        """
             Return the LCS / max(len(w1),len(w2))
-        '''
+        """
         return float(self.lcs_len1(word1, word2)) / max(len(word1), len(word2))
 
     # @profile
     def contractor_sim(self, s1, s2):
-        '''
+        """
             Implementation of Contractor et al.'s similarity function
-        '''
+        """
         """# Cache results
         key = s1+'.'+s2
         key = key.encode("utf-8")
@@ -256,9 +252,9 @@ class Generator:
 
     # @profile
     def expand_word(self, noisyWord):
-        '''
+        """
             Expand 1) transliterate letters 2) ??...
-        '''
+        """
         expTmp = ['']   # .. and empty candidate strings
 
         # generate possible transliterations
@@ -332,7 +328,7 @@ class Generator:
                     heapq.heappush(topK, (sim, w))
                 else:           # next (N-K), insert if sim>smallest sim in heap (root)
                     try:
-                        if (sim > topK[0][0]):
+                        if sim > topK[0][0]:
                             heapq.heapreplace(topK, (sim, w))
                     except IndexError:
                         heapq.heappush(topK, (sim, w))
@@ -429,7 +425,7 @@ class Generator:
                     if phonetic_c[1]:
                         candidates.append(phonetic_c[1])
                 # sim_function=self.edit_dist
-                lexicon = [self.phonetic_keys for i in range(len(candidates))]
+                lexicon = [self.phonetic_keys for _ in range(len(candidates))]
                 sim_function = self.phonetic_ed_sim
                 phon_conf_set = self.rank_candidates(
                     candidates, lexicon, sim_function, off_by_ones)
@@ -548,9 +544,10 @@ class Generator:
                 # print("NODES: {}".format(nodes))
                 conf_net.append([(1.0, '*E*')])
 
-        pfsg_out = ["name SOMENAME\n"]
-        pfsg_out.append("numaligns " + str(len(conf_net)) + "\n")
-        pfsg_out.append("posterior 1\n")
+        pfsg_out = ["name SOMENAME\n",
+                    "numaligns {}\n".format(str(len(conf_net))),
+                    "posterior 1\n"]
+
         for i, nodes in enumerate(conf_net):
             align_str = "align " + str(i)
 

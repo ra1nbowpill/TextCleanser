@@ -1,8 +1,8 @@
 # coding = utf-8
 
 
-class PhoneticAlgorithms():
-    '''
+class PhoneticAlgorithms:
+    """
      This script implements the Double Metaphone algorithm (c) 1998, 1999 by Lawrence Philips
      it was translated to Python from the C source written by Kevin Atkinson (http://aspell.net/metaphone/)
      By An@drew Collins - January 12, 2007 who claims no rights to this work
@@ -14,7 +14,7 @@ class PhoneticAlgorithms():
         bug squashing effort. There were many cases where this function wouldn't give the same output
         as the original C source that were fixed by his careful attention and excellent communication.
         The script was also updated to use utf-8 rather than latin-1.
-    '''
+    """
 
     def __init__(self):
         pass
@@ -33,7 +33,7 @@ class PhoneticAlgorithms():
         length = len(st)
         first = 2
         # so we can index beyond the begining and end of the input string
-        st = ('-') * first + st + (' ' * 5)
+        st = '-' * first + st + (' ' * 5)
         last = first + length - 1
         pos = first  # pos is short for position
         pri = sec = ''  # primary and secondary metaphone codes
@@ -66,7 +66,7 @@ class PhoneticAlgorithms():
                     nxt = ('P', 1)
             elif ch == 'C':
                 # various germanic
-                if (pos > (first + 1) and st[pos - 2] not in vowels and st[pos - 1:pos + 2] == 'ACH' and (st[pos + 2] not in ['I', 'E'] or st[pos - 2:pos + 4] in ['BACHER', 'MACHER'])):
+                if pos > (first + 1) and st[pos - 2] not in vowels and st[pos - 1:pos + 2] == 'ACH' and (st[pos + 2] not in ['I', 'E'] or st[pos - 2:pos + 4] in ['BACHER', 'MACHER']):
                     nxt = ('K', 2)
                 # special case 'CAESAR'
                 elif pos == first and st[first:first + 6] == 'CAESAR':
@@ -412,9 +412,9 @@ class PhoneticAlgorithms():
                     sec += nxt[1]
                 pos += nxt[2]
         if pri == sec:
-            return (pri, None)
+            return pri, None
         else:
-            return (pri, sec)
+            return pri, sec
 
 
 if __name__ == '__main__':
@@ -439,4 +439,4 @@ if __name__ == '__main__':
 
     for name in names.keys():
         assert (pa.double_metaphone(name) == names[name]), 'For "{}" function returned {}. Should be {}.'.format(
-            name, pa.doubleMetaphone(name), names[name])
+            name, pa.double_metaphone(name), names[name])

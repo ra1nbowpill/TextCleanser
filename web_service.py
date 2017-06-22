@@ -11,7 +11,7 @@ import cherrypy
 from cleanser import TextCleanser
 
 
-class CleanserWebService():
+class CleanserWebService:
 
     def __init__(self):
         self.tc = TextCleanser()

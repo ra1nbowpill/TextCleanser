@@ -1,20 +1,19 @@
-
 import re
-from generator import Generator
+
 from cleanser import TextCleanser
-import string
-import glob
+from generator import Generator
+
+
 # import cleanse_tweets
-import shelve
-import os
 
 
 class Evaluator(object):
-    '''
+    """
     This module computes evaluation statistics on text normalisation performance
-    '''
+    """
 
     def __init__(self):
+        self.gold_sent_clean = []
         self.gen = Generator()
         self.cleanser = TextCleanser()
         gen = self.gen
@@ -22,12 +21,11 @@ class Evaluator(object):
         self.cleanse_methods = {gen.IBM_SIM: cln.heuristic_cleanse,
                                 gen.SSK_SIM: cln.ssk_cleanse,
                                 gen.PHONETIC_ED_SIM: cln.phonetic_ED_cleanse}
+        self.gold_word_pairs = []
+        self.gold_sent_pairs = []
 
     def load_gold_standard(self, file, data_accessor=None):
         """ load a parallel noisy-clean gold standard dataset into (noisyword, cleaned_word) tuples"""
-
-        self.gold_word_pairs = []
-        self.gold_sent_pairs = []
 
         if data_accessor is None:  # default
             # load Bo Han's dataset
@@ -87,8 +85,6 @@ class Evaluator(object):
         if not input:
             input = self.gold_sent_pairs
 
-        self.gold_sent_clean = []
-
         n = 0
         for sent_num, sent_in_tok in enumerate(input):
             print("Processing sentence {}".format(n))
@@ -98,7 +94,6 @@ class Evaluator(object):
             # gold token 1), ..]
             sent_str = ' '.join([tok_pair[0] for tok_pair in sent_in_tok])
 
-            gen = self.gen
             sent_clean, error, replacements = selectormethod(
                 sent_str, gen_off_by_ones=False)
             if log_replacements:

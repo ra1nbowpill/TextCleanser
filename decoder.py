@@ -8,15 +8,15 @@ import subprocess
 import sys
 import re
 
-LATTICE_TOOL_DIR="/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/srilm-1.6.0/bin/macosx/"
+LATTICE_TOOL_DIR = "/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/srilm-1.6.0/bin/macosx/"
 
-LM_DIR="/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/TextCleanser/data/"
+LM_DIR = "/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/TextCleanser/data/"
 EMPTY_SYM = "EMPTYSYM"   # placeholder for empty symbol
 NGRAM_SERVER_IP = "12345@127.0.0.1"  # put the port@ip of ngram server
 # if it isn't running on the local machine
 
 
-class Decoder():
+class Decoder:
     """This class decodes a word lattice in pfsg format as output by Generator module's
         generate_word_lattice() function to produce the most likely sentence."""
 

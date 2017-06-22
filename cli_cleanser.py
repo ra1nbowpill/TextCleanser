@@ -8,20 +8,16 @@
     Contact: stephan@ml.sun.ac.za
 """
 
-from cleanser import TextCleanser
-import json
-import codecs
-import getopt
 import sys
-import time
-from random import choice
+
+from cleanser import TextCleanser
 
 if __name__ == '__main__':
     # print("Noisy text cleanser")
     clnsr = TextCleanser()
 
     text = sys.stdin.readline()
-    while (text):
+    while text:
         if len(text) <= 1:
             break
         # cleantext,error,replacements = clnsr.heuristic_cleanse(text, gen_off_by_ones=False)

@@ -6,10 +6,8 @@ Author: Stephan Gouws
 Contact: stephan@ml.sun.ac.za
 """
 
-from generator import Generator
 from decoder import Decoder
-import re
-import nltk
+from generator import Generator
 
 
 class TextCleanser(object):
@@ -57,7 +55,7 @@ class TextCleanser(object):
         return cleantext, error, replacements
 
     def ssk_cleanse(self, text, gen_off_by_ones=False):
-        "Use subsequence overlap similarity function"
+        """Use subsequence overlap similarity function"""
         return self.heuristic_cleanse(text, gen_off_by_ones, ssk=True)
 
     def log_oovs(self, text):

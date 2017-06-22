@@ -1,12 +1,12 @@
-'''
+"""
 Created on 14 Apr 2011
 
 @author: stephan
-'''
+"""
 import shelve
 
 
-class StringFunctions():
+class StringFunctions:
 
     def __init__(self, lamb, p):
         self.ssk_cache = shelve.open('ssk_lamb%.2f_p%d_cache' % (lamb, p))
