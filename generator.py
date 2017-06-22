@@ -15,22 +15,25 @@ import math
 import re
 import string
 import csv
+import os
 from phonetic_algorithms import PhoneticAlgorithms
 from string_functions import StringFunctions
 import pickle as pickle
 
+TEXTCLEANSER_ROOT = os.path.split(os.path.realpath(__file__))[0] + os.sep
 
 # constants
-LEXICON_FILENAME = "data/combined_lex.pickl"
-PHON_LEX_FILENAME = "data/phonetic_lex.pickl"
-PHONE_LEX_KEYS_FILENAME = "data/phonetic_lex_keys.pickl"
-SUB_LEX_FILENAME = "data/sub_lexicon.pickl"
-# set(nltk.corpus.stopwords.words())
-STOPWORDS = pickle.load(open("data/stopwords-set.pickl", "rb"), encoding="UTF-8")
+LEXICON_FILENAME = TEXTCLEANSER_ROOT + "data/combined_lex.pickl"
+PHON_LEX_FILENAME = TEXTCLEANSER_ROOT + "data/phonetic_lex.pickl"
+PHONE_LEX_KEYS_FILENAME = TEXTCLEANSER_ROOT + "data/phonetic_lex_keys.pickl"
+SUB_LEX_FILENAME = TEXTCLEANSER_ROOT + "data/sub_lexicon.pickl"
+STOPWORDS_FILENAME = TEXTCLEANSER_ROOT + "data/stopwords-set.pickl"
+
 ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 CONSONANTS = "bcdfghjklmnpqrstvwxyz"
 PUNC = string.punctuation
-# LATTICE_TOOL_DIR = "/media/Data/work/Tools/srilm/bin/i686-m64/"
+STOPWORDS = pickle.load(open(STOPWORDS_FILENAME, "rb"), encoding="UTF-8")
+
 # placeholder for empty symbol, such that tokeniser doesn't split it
 EMPTY_SYM = "EMPTYSYM"
 
