@@ -28,6 +28,7 @@ PHON_LEX_FILENAME = TEXTCLEANSER_ROOT + "data/phonetic_lex.pickl"
 PHONE_LEX_KEYS_FILENAME = TEXTCLEANSER_ROOT + "data/phonetic_lex_keys.pickl"
 SUB_LEX_FILENAME = TEXTCLEANSER_ROOT + "data/sub_lexicon.pickl"
 STOPWORDS_FILENAME = TEXTCLEANSER_ROOT + "data/stopwords-set.pickl"
+COMMON_ABBR_FILENAME = TEXTCLEANSER_ROOT + "data/common_abbrs.csv"
 
 ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 CONSONANTS = "bcdfghjklmnpqrstvwxyz"
@@ -83,7 +84,7 @@ class Generator:
         # load list of common abbreviations, adapt common_abbrs.csv to your own
         # needs
         self.abbr_list = {}
-        for row in csv.reader(open("data/common_abbrs.csv"), delimiter=","):
+        for row in csv.reader(open(COMMON_ABBR_FILENAME), delimiter=","):
             self.abbr_list[row[0]] = row[1]
         print("Loaded list of {} common abbreviations.".format(len(self.abbr_list)))
 
