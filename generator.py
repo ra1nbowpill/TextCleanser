@@ -164,7 +164,7 @@ class Generator:
         Return the length of the LCS of xs and ys.
 
         Example:
-        >>> lcs_length("HUMAN", "CHIMPANZEE")
+        >> lcs_length("HUMAN", "CHIMPANZEE")
         4
         """
         ny = len(ys)
@@ -457,6 +457,10 @@ class Generator:
             if weight == 0:
                 weight = 0.2        # add original word with some low probability
             conf_set.append((weight, noisyWord))
+
+            conf_set = [tok for tok in conf_set if tok[0] > 0 and tok[1] != '']
+            if len(conf_set) == 0:
+                conf_set = [(1.0, '*E*')]
             return conf_set
 
         else:
@@ -527,46 +531,11 @@ class Generator:
             confusion_set = [self.get_OOV(nw.lower()) for nw in words]
         else:
             # get candidates for each word
-            confusion_set = [self.word_generate_candidates(
-                nw.lower(), rank_method, off_by_ones) for nw in words]
+            confusion_set = [self.word_generate_candidates(nw.lower(), rank_method, off_by_ones)
+                             for nw in words]
+            print(confusion_set)
 
         return replacements, words, confusion_set
-
-    def generate_word_mesh(self, confusion_net):
-        """
-            A word mesh is a more constrained form of a word lattice.
-            It follows much more readily given the confusion network input,
-            and lets SRI-LM create the lattice itself.
-        """
-        conf_net = []
-        for nodes in confusion_net:
-            # remove zero probability words and empty words
-            keepnodes = [n for n in nodes if n[0] > 0 and n[1] != '']
-            if len(keepnodes) > 0:
-                conf_net.append(keepnodes)
-            else:
-                # print("NODES: {}".format(nodes))
-                conf_net.append([(1.0, '*E*')])
-
-        pfsg_out = ["name SOMENAME\n",
-                    "numaligns {}\n".format(str(len(conf_net))),
-                    "posterior 1\n"]
-
-        for i, nodes in enumerate(conf_net):
-            align_str = "align " + str(i)
-
-            # normalising constant for nodes' probabilities
-            # print(to_nodes)
-            nodes_total = sum([n[0] for n in nodes])
-
-            for node in nodes:
-                p = node[0]
-                w = node[1]
-                align_str += " {} {}".format(w, p / nodes_total)
-            align_str += "\n"
-            pfsg_out.append(align_str)
-
-        return ''.join(pfsg_out)
 
 
 """
@@ -595,5 +564,3 @@ if __name__ == "__main__":
         _, _, c = gen.sent_generate_candidates(s, Generator.IBM_SIM)
         print("Sentence: {}".format(s))
         print("Candidate list: {}".format(c))
-        word_lattice = gen.generate_word_mesh(c)
-        print("Word mesh: {}".format(word_lattice))

@@ -10,7 +10,7 @@ import re
 import select
 
 LATTICE_TOOL_DIR = "/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/srilm-1.6.0/bin/macosx/"
-LM_DIR = "/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/TextCleanser/data/"
+LM_DIR = "/Users/ygorgallina/Documents/Cours/M1/Stage/Outils/TextCleanser.git/data/"
 
 EMPTY_SYM = "EMPTYSYM"   # placeholder for empty symbol
 
@@ -118,10 +118,39 @@ class Decoder:
     def close(self):
         self.stop_ngram_server()
 
-    def decode(self, word_mesh):
+    def pfsg_of_conf_net(self, confusion_net):
+        """
+            A word mesh is a more constrained form of a word lattice.
+            It follows much more readily given the confusion network input,
+            and lets SRI-LM create the lattice itself.
+        """
+
+        pfsg_out = ["name SOMENAME\n",
+                    "numaligns {}\n".format(str(len(confusion_net))),
+                    "posterior 1\n"]
+
+        for i, nodes in enumerate(confusion_net):
+            align_str = "align " + str(i)
+
+            # normalising constant for nodes' probabilities
+            # print(to_nodes)
+            nodes_total = sum([n[0] for n in nodes])
+
+            for node in nodes:
+                p = node[0]
+                w = node[1]
+                align_str += " {} {}".format(w, p / nodes_total)
+            align_str += "\n"
+            pfsg_out.append(align_str)
+
+        return ''.join(pfsg_out)
+
+    def decode(self, confusion_net):
         """ @param word_mesh string containing word mesh to decode in pfsg format
             @return (stdout,stderr)
         """
+
+        word_mesh = self.pfsg_of_conf_net(confusion_net)
 
         if not self.is_running:
             return None, "Server not running"

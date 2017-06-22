@@ -29,17 +29,11 @@ class TextCleanser(object):
             string_sim_func = gen.IBM_SIM
         replacements, old_tokens, candidates = gen.sent_generate_candidates(text, string_sim_func,
                                                                             gen_off_by_ones)
-        # print(candidates)
-        # word_lattice = gen.generate_word_lattice(candidates)
-        word_mesh = gen.generate_word_mesh(candidates)
-        cleantext, error = self.decoder.decode(word_mesh)
+        cleantext, error = self.decoder.decode(candidates)
         if error:
-            print("mesh: {}".format(word_mesh))
             print(cleantext)
             print(error)
-            # raw_input("[PRESS ENTER]")
-            # exit(2)
-        # print("clean: {}".format(cleantext))
+
         replacements = self.get_replacements(cleantext, old_tokens)
         return cleantext, error, replacements
 
@@ -49,8 +43,7 @@ class TextCleanser(object):
                                                                             gen_off_by_ones)
         # print(candidates)
         # word_lattice = gen.generate_word_lattice(candidates)
-        word_mesh = gen.generate_word_mesh(candidates)
-        cleantext, error = self.decoder.decode(word_mesh)
+        cleantext, error = self.decoder.decode(candidates)
         replacements = self.get_replacements(cleantext, old_tokens)
         return cleantext, error, replacements
 
