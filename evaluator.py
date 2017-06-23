@@ -58,7 +58,7 @@ class Evaluator(object):
     def log_oov_from_gold_pairs(self, oov_file):
         """ Log all OOV tokens in gold standard to log file"""
         for (noisy, clean) in self.gold_word_pairs:
-            result = self.gen.get_OOV(noisy)
+            result = self.gen.get_oov(noisy)
             if result != []:
                 # write all expanded variants to file
                 oov_file.write(','.join(result) + '\n')

@@ -8,17 +8,17 @@
 """
 
 import collections
-import itertools
+import csv
 import heapq
-import time
-import math
+import os
+import pickle as pickle
 import re
 import string
-import csv
-import os
+import sys
+import time
+
 from phonetic_algorithms import PhoneticAlgorithms
-from string_functions import StringFunctions
-import pickle as pickle
+import string_functions as str_fun
 
 TEXTCLEANSER_ROOT = os.path.split(os.path.realpath(__file__))[0] + os.sep
 
@@ -31,7 +31,6 @@ STOPWORDS_FILENAME = TEXTCLEANSER_ROOT + "data/stopwords-set.pickl"
 COMMON_ABBR_FILENAME = TEXTCLEANSER_ROOT + "data/common_abbrs.csv"
 
 ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
-CONSONANTS = "bcdfghjklmnpqrstvwxyz"
 PUNC = string.punctuation
 STOPWORDS = pickle.load(open(STOPWORDS_FILENAME, "rb"), encoding="UTF-8")
 
@@ -86,23 +85,7 @@ class Generator:
         self.abbr_list = {}
         for row in csv.reader(open(COMMON_ABBR_FILENAME), delimiter=","):
             self.abbr_list[row[0]] = row[1]
-        print("Loaded list of {} common abbreviations.".format(len(self.abbr_list)))
-
-        # initialise translit dictionary
-        translit_inits = {'0': ['0', 'o'],
-                          '1': ['1', 'l', 'one'],
-                          '2': ['2', 'to', 'two'],
-                          '3': ['3', 'e', 'three'],
-                          '4': ['4', 'a', 'four', 'for'],
-                          '5': ['5', 's', 'five'],
-                          '6': ['6', 'six', 'b'],
-                          '7': ['7', 't', 'seven'],
-                          '8': ['8', 'eight', 'ate'],
-                          '9': ['9', 'nine', 'g'],
-                          '@': ['@', 'at'],
-                          '&': ['&', 'and']}
-        self.translit = {}
-        self.translit.update(translit_inits)
+        sys.stderr.write("Loaded list of {} common abbreviations.\n".format(len(self.abbr_list)))
 
         # print("Loaded lexicon of size: {}".format(len(self.lexicon)))
 
@@ -112,12 +95,11 @@ class Generator:
         # load phonetic similarity function
         self.phon_sim = PhoneticAlgorithms().double_metaphone
         # load subsequence-kernel similarity function
-        ssk = StringFunctions(lamb=0.8, p=2)
+        ssk = str_fun.StringFunctions(lamb=0.8, p=2)
         self.ssk_sim = ssk.SSK
 
         # smiley regex
-        self.smiley_regex = re.compile(
-            "[:;]-?[DP()\\\|bpoO0]{1,2}")     # recognise emoticons
+        self.smiley_regex = re.compile("[:;]-?[DP()\\\|bpoO0]{1,2}")  # recognise emoticons
         self.lt_gt_regex = re.compile("&[lr]t;[\d]?")
         # pnc = ''.join(l for l in [string.punctuation]) + " \t"  # remove double punctuation and spaces
         # regexes for detecting usernames, hashtags, rt's and urls at the token
@@ -153,142 +135,9 @@ class Generator:
             consonant found, for faster lookup"""
         cons_lex = collections.defaultdict(list)
         for w in self.lexicon:
-            first_letter = self.get_first_cons(w)
+            first_letter = str_fun.get_first_cons(w)
             cons_lex[first_letter].append(w)
         return cons_lex
-
-    # @profile
-    def lcs_len1(self, xs, ys):
-        """
-        from: http://wordaligned.org/articles/longest-common-subsequence
-        Return the length of the LCS of xs and ys.
-
-        Example:
-        >> lcs_length("HUMAN", "CHIMPANZEE")
-        4
-        """
-        ny = len(ys)
-        curr = list(itertools.repeat(0, 1 + ny))
-        for x in xs:
-            prev = list(curr)
-            for i, y in enumerate(ys):
-                if x == y:
-                    curr[i + 1] = prev[i] + 1
-                else:
-                    curr[i + 1] = max(curr[i], prev[i + 1])
-        return curr[ny]
-
-    # @profile
-    def lcs_len2(self, X, Y):
-        """
-            http://en.wikibooks.org/wiki/Algorithm_implementation/Strings/Longest_common_subsequence#Computing_the_length_of_the_LCS
-        """
-        m = len(X)
-        n = len(Y)
-
-        # An (m+1) times (n+1) matrix
-        C = [[0] * (n + 1) for i in range(m + 1)]
-        for i in range(1, m + 1):
-            for j in range(1, n + 1):
-                if X[i - 1] == Y[j - 1]:
-                    C[i][j] = C[i - 1][j - 1] + 1
-                else:
-                    C[i][j] = max(C[i][j - 1], C[i - 1][j])
-        return C[i][j]
-
-    # @profile
-    def cs(self, s):
-        """
-            generates the consonant skeleton of a word, 'shop' -> 'shp'
-        """
-        return ''.join([l for l in s.lower() if l not in 'aeiou'])
-
-    # @profile
-    def edit_dist(self, s1, s2):
-        if len(s1) < len(s2):
-            return self.edit_dist(s2, s1)
-        if not s1:
-            return len(s2)
-
-        previous_row = range(len(s2) + 1)
-        for i, c1 in enumerate(s1):
-            current_row = [i + 1]
-            for j, c2 in enumerate(s2):
-                # j+1 instead of j since previous_row and current_row are one
-                # character longer
-                insertions = previous_row[j + 1] + 1
-                deletions = current_row[j] + 1       # than s2
-                substitutions = previous_row[j] + (c1 != c2)
-                current_row.append(min(insertions, deletions, substitutions))
-            previous_row = current_row
-
-        return previous_row[-1]
-
-    # @profile
-    def lcs_ratio(self, word1, word2):
-        """
-            Return the LCS / max(len(w1),len(w2))
-        """
-        return float(self.lcs_len1(word1, word2)) / max(len(word1), len(word2))
-
-    # @profile
-    def contractor_sim(self, s1, s2):
-        """
-            Implementation of Contractor et al.'s similarity function
-        """
-        """# Cache results
-        key = s1+'.'+s2
-        key = key.encode("utf-8")
-        sim_val = 0.0
-        if key not in self.sim_cache:
-            lcs_ratio = self.lcs_ratio(s1,s2)
-            sim_val = self.sim_cache[key] = float(lcs_ratio / (self.edit_dist(self.cs(s1), self.cs(s2))+1))
-        else:
-            sim_val = self.sim_cache[key]"""
-        lcs_ratio = self.lcs_ratio(s1, s2)
-        sim_val = float(
-            lcs_ratio / (self.edit_dist(self.cs(s1), self.cs(s2)) + 1))
-        return sim_val
-
-    def phonetic_ed_sim(self, s1, s2):
-        """Computes the phonetic edit distance SIMILARITY between two strings"""
-        return math.exp(-(self.edit_dist(s1, s2)))
-
-    # @profile
-    def expand_word(self, noisyWord):
-        """
-            Expand 1) transliterate letters 2) ??...
-        """
-        expTmp = ['']   # .. and empty candidate strings
-
-        # generate possible transliterations
-        for l in noisyWord:
-            expansions = []
-            try:
-                translits = self.translit[l]
-            except KeyError:
-                translits = [l]
-            for e in expTmp:
-                for c in translits:
-                    expansions.append(e + c)
-            expTmp = expansions[:]
-        return expTmp  # .append(self.expand_token(noisyWord))
-
-    def get_first_cons(self, word):
-        """Get first consonant or just first letter if no consonant found"""
-        for l in word:
-            if l in CONSONANTS:
-                return l
-        return word[0]
-
-    def word_edits(self, word):
-        """Norvig's spelling corrector code for generating off-by-one candidates"""
-        splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]
-        deletes = [a + b[1:] for a, b in splits if b]
-        transposes = [a + b[1] + b[0] + b[2:] for a, b in splits if len(b) > 1]
-        replaces = [a + c + b[1:] for a, b in splits for c in ALPHABET if b]
-        inserts = [a + c + b for a, b in splits for c in ALPHABET]
-        return set(deletes + transposes + replaces + inserts)
 
     def expand_abbrs(self, tok):
         """Look for and expand commonly occurring Internet and other abbreviations.
@@ -311,15 +160,15 @@ class Generator:
             off_by_ones = []
             for candidate in candidates:
                 # if w in lexicon]
-                off_by_ones.extend([w for w in self.word_edits(candidate)])
+                off_by_ones.extend([w for w in str_fun.word_edits(candidate)])
             candidates.extend(list(set(off_by_ones)))
             # print("{} after adding edits.".format(len(noisyWords)))
 
         # compute scores with words in lexicon
         K = self.topK
-        topK = []    # top K heap of candidate words
+        top_k = []    # top K heap of candidate words
 
-        curW = 0
+        cur_w = 0
         for i, cand_token in enumerate(candidates):
             # for w in self.lexicon:
             lexicon = lexicon_list[i]
@@ -328,18 +177,18 @@ class Generator:
                 sim = sim_function(cand_token, w)
                 if sim == 0:      # don't add zero-prob words
                     continue
-                if curW < K:        # first K, just insert into heap
-                    heapq.heappush(topK, (sim, w))
+                if cur_w < K:        # first K, just insert into heap
+                    heapq.heappush(top_k, (sim, w))
                 else:           # next (N-K), insert if sim>smallest sim in heap (root)
                     try:
-                        if sim > topK[0][0]:
-                            heapq.heapreplace(topK, (sim, w))
+                        if sim > top_k[0][0]:
+                            heapq.heapreplace(top_k, (sim, w))
                     except IndexError:
-                        heapq.heappush(topK, (sim, w))
-                curW += 1
+                        heapq.heappush(top_k, (sim, w))
+                cur_w += 1
 
-        # return heapq.nlargest(K, topK, key=lambda x:x[0])
-        conf_set = heapq.nlargest(K - 1, topK, key=lambda x: x[0])
+        # return heapq.nlargest(K, top_k, key=lambda x:x[0])
+        conf_set = heapq.nlargest(K - 1, top_k, key=lambda x: x[0])
         # remove all 0-prob elements
         for elem in conf_set:
             if elem[0] == 0:
@@ -348,19 +197,19 @@ class Generator:
 
     def hash_user_rt_url(self, tok):
         # if noisyWord in ['rt', 'hshtg', 'usr', 'url', EMPTY_SYM]:
-        hashTags = self.hashTags
+        hash_tags = self.hashTags
         username = self.username
         rt = self.rt
         urls = self.urls
-        if hashTags.search(tok) or username.search(tok) or rt.search(tok) or urls.search(tok):
+        if hash_tags.search(tok) or username.search(tok) or rt.search(tok) or urls.search(tok):
             return True
         else:
             return False
 
-    def check_oov_but_valid(self, noisyWord):
+    def check_oov_but_valid(self, noisy_word):
         # check if it is a common abbreviation or contracted form
         # TODO: Is this the right place to do this?
-        abbr = self.expand_abbrs(noisyWord.strip("'"))
+        abbr = self.expand_abbrs(noisy_word.strip("'"))
         if abbr is not None:
             # TODO: this never replaces lol, etc with EMPTY_SYM after decoding
             #            return [(0.8, abbr), (0.2, noisyWord)]
@@ -371,69 +220,69 @@ class Generator:
         # e.g. "9/11" (dates), "4-4" (scores), etc. and ignore
         # Simple first idea, if it contains _no letters_, ignore
 
-        if not re.search("[a-z]", noisyWord):
-            return [(1.0, noisyWord)]
+        if not re.search("[a-z]", noisy_word):
+            return [(1.0, noisy_word)]
 
         # check for punctuation
-        if noisyWord in PUNC:
-            return [(1.0, noisyWord)]
+        if noisy_word in PUNC:
+            return [(1.0, noisy_word)]
 
         # check for USR or URL or EMPTY_SYM  special tokens
         # noisy=hashTags.sub('hshtg', username.sub('usr', rt.sub('rt', urls.sub('url', noisy))))
-        if self.hash_user_rt_url(noisyWord) or noisyWord in [EMPTY_SYM]:
-            return [(1.0, noisyWord)]
+        if self.hash_user_rt_url(noisy_word) or noisy_word in [EMPTY_SYM]:
+            return [(1.0, noisy_word)]
 
         # otherwise
         return None
 
     # @profile
-    def word_generate_candidates(self, noisyWord, rank_method, off_by_ones=False):
+    def word_generate_candidates(self, noisy_word, rank_method, off_by_ones=False):
         """Generate a confusion set of possible candidates for a word using some rank_method,
             currently supported methods include:
             Generator.IBM_SIM - implementation of the heuristic used in Contractor et al. 2010
             Generator.SSK_SIM - a 2-char string subsequence similarity function
             Generator.PHONETIC_ED_SIM - a phonetic edit distance"""
 
-        oov_but_valid = self.check_oov_but_valid(noisyWord)
+        oov_but_valid = self.check_oov_but_valid(noisy_word)
         if oov_but_valid:
             return oov_but_valid
 
         # TODO: This seems clumsy, lexicon should include STOPWORDS by default
         # O(1) for sets
-        if noisyWord not in self.lexicon and noisyWord not in STOPWORDS:
+        if noisy_word not in self.lexicon and noisy_word not in STOPWORDS:
             # expand noisy word
-            noisyWords = self.expand_word(noisyWord)
+            noisy_words = str_fun.expand_word(noisy_word)
 
             # 1) IBM_SIMILARITY and SUBSEQUENCE-KERNEL SIMILARITY
             if rank_method in [Generator.IBM_SIM, Generator.SSK_SIM]:
-                first_letters = [self.get_first_cons(w) for w in noisyWords]
+                first_letters = [str_fun.get_first_cons(w) for w in noisy_words]
                 lexicon = [self.sub_lexicon[first_letter]
                            for first_letter in first_letters]
                 if rank_method == Generator.IBM_SIM:
-                    sim_function = self.contractor_sim
+                    sim_function = str_fun.contractor_sim
                 else:
                     sim_function = self.ssk_sim
-                candidates = noisyWords
+                candidates = noisy_words
                 conf_set = self.rank_candidates(
                     candidates, lexicon, sim_function, off_by_ones)
 
             # 2) PHONETIC EDIT DISTANCE SIMILARITY
             elif rank_method == Generator.PHONETIC_ED_SIM:
-                # candidates=set([self.phon_sim(c)[0] for c in noisyWords])
+                # candidates=set([self.phon_sim(w)[0] for w in noisy_words])
                 # Include both primary and secondary codes!
                 candidates = []
-                for c in noisyWords:
-                    phonetic_c = self.phon_sim(c)
-                    if phonetic_c[0]:
-                        candidates.append(phonetic_c[0])
-                    if phonetic_c[1]:
-                        candidates.append(phonetic_c[1])
+                for w in noisy_words:
+                    phonetic_w = self.phon_sim(w)
+                    if phonetic_w[0]:
+                        candidates.append(phonetic_w[0])
+                    if phonetic_w[1]:
+                        candidates.append(phonetic_w[1])
                 # sim_function=self.edit_dist
                 lexicon = [self.phonetic_keys for _ in range(len(candidates))]
-                sim_function = self.phonetic_ed_sim
+                sim_function = str_fun.phonetic_ed_sim
                 phon_conf_set = self.rank_candidates(
                     candidates, lexicon, sim_function, off_by_ones)
-                # print("noisyWords: {}".format(noisyWords))
+                # print("noisy_words: {}".format(noisy_words))
                 # print("phonetic codes: {}".format(candidates))
                 # print("phonetic confusion set: {}".format(phon_conf_set))
                 # expand phonetic codes into their likely candidate words
@@ -456,7 +305,7 @@ class Generator:
                 weight = 1.0        # there's nothing in the confusion set
             if weight == 0:
                 weight = 0.2        # add original word with some low probability
-            conf_set.append((weight, noisyWord))
+            conf_set.append((weight, noisy_word))
 
             conf_set = [tok for tok in conf_set if tok[0] > 0 and tok[1] != '']
             if len(conf_set) == 0:
@@ -471,13 +320,13 @@ class Generator:
             # only way to get (ii) is to use a spelling error approach and include all 'off-by-one' errors in the
             # confusion set, e.g. as computed by Norvig's spelling corrector.
             # For (i) need to use phonetic lookup.
-            return [(1.0, noisyWord)]
+            return [(1.0, noisy_word)]
 
-    def get_OOV(self, noisyWord):
-        if self.check_oov_but_valid(noisyWord) or noisyWord in self.lexicon or noisyWord in STOPWORDS:
+    def get_oov(self, noisy_word):
+        if self.check_oov_but_valid(noisy_word) or noisy_word in self.lexicon or noisy_word in STOPWORDS:
             return []
         else:
-            return self.expand_word(noisyWord)
+            return str_fun.expand_word(noisy_word)
 
     def sent_preprocess(self, sent):
         # collapse punctuation marks occurring > 1 into one
@@ -503,7 +352,7 @@ class Generator:
                     r'\1 \2 \3', tok).split(' ') if tok != ''])
         return out_tokens
 
-    def sent_generate_candidates(self, sent, rank_method, off_by_ones=False, log_OOV=False):
+    def sent_generate_candidates(self, sent, rank_method, off_by_ones=False, log_oov=False):
         """Generate 'confusion set' from a sentence.
             Return (r,w,c) replacements made (smileys), words after tokenisation and confusion set."""
         # perform some simple pre-processing
@@ -527,8 +376,8 @@ class Generator:
         # fix bad tokenisation issues
         words = self.fix_bad_tokenisation(words)
 
-        if log_OOV:
-            confusion_set = [self.get_OOV(nw.lower()) for nw in words]
+        if log_oov:
+            confusion_set = [self.get_oov(nw.lower()) for nw in words]
         else:
             # get candidates for each word
             confusion_set = [self.word_generate_candidates(nw.lower(), rank_method, off_by_ones)
@@ -555,11 +404,11 @@ if __name__ == "__main__":
 
     gen = Generator()
 
-    for w in testWords:
-        # print(gen.expand_word(w))
-        print(gen.word_generate_candidates(w, Generator.PHONETIC_ED_SIM))
+    for word in testWords:
+        # print(gen.expand_word(word))
+        print(gen.word_generate_candidates(word, Generator.PHONETIC_ED_SIM))
 
-    for s in testSents:
-        _, _, c = gen.sent_generate_candidates(s, Generator.IBM_SIM)
-        print("Sentence: {}".format(s))
+    for sent in testSents:
+        _, _, c = gen.sent_generate_candidates(sent, Generator.IBM_SIM)
+        print("Sentence: {}".format(sent))
         print("Candidate list: {}".format(c))
