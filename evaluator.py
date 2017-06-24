@@ -69,7 +69,7 @@ class Evaluator(object):
             for r in repl:
                 repl_log_f.write("{}\t{}\t{}\n".format(tweet_id, r[0], r[1]))
 
-    def get_cleanser_output(self, rankmethod, input=None, log_replacements=False):
+    def get_cleanser_output(self, rankmethod, input=None, log_replacements=False, range_=None):
         """Expects input as [[(token 1, gold token 1), ..], ..] sentence pairs"""
         # run the cleanser using the specified $rankmethod over all sentence
         # pairs
@@ -85,6 +85,9 @@ class Evaluator(object):
             input = self.gold_sent_pairs
 
         for sent_num, sent_in_tok in enumerate(input):
+            if range_ is not None and sent_num not in range_:
+                continue
+
             print("Processing sentence {}".format(sent_num))
 
             # reconstruct sentence string, assuming it's in the form [(token 1,
@@ -153,9 +156,66 @@ class Evaluator(object):
                 num_incorrect += 1
         return float(num_incorrect) / float(N)
 
-    def compute_p_r_f(self):
-        """Compute precision, recall and f-score"""
-        pass
+    def compute_p_r_f(self, token_norm=None):
+        """
+            Compute precision, recall and f-score following
+            Han et al. "Automatically Constructing a Normalisation Dictionary for Microblogs"
+        """
+
+        normalized = 0
+        true_positiv = 0
+        true_negativ = 0
+        false_positiv = 0
+        false_negativ = 0
+        require_normalization = 0
+
+        for t_i, t_o, t_c in [t for sent in self.gold_sent_clean for t in sent]:
+            if token_norm is not None:
+                t_i = token_norm(t_i)
+                t_c = token_norm(t_c)
+                t_o = token_norm(t_o)
+
+            must_be_normalized = t_i != t_o
+            if must_be_normalized:
+                require_normalization += 1
+
+            was_normalized = t_c != t_i
+            if was_normalized:
+                normalized += 1
+
+            right_normalization = t_c == t_o
+
+            if not must_be_normalized:
+                if was_normalized:
+                    false_positiv += 1
+                else:
+                    true_negativ += 1
+            if must_be_normalized:
+                if not was_normalized:
+                    false_negativ += 1
+                elif right_normalization:
+                    true_positiv += 1
+                elif not right_normalization:
+                    false_negativ += 1
+
+        if normalized != 0:
+            precision = true_positiv / normalized
+            # false_alarm = false_negativ / normalized
+        else:
+            precision = 0
+            # false_alarm = 0
+
+        if require_normalization != 0:
+            recall = true_positiv / require_normalization
+        else:
+            recall = 0
+
+        if precision + recall != 0:
+            f_score = (2 * precision * recall) / (precision + recall)
+        else:
+            f_score = 0
+
+        return precision, recall, f_score
 
     def compute_bleu(self, sentence_pair):
         """ Compute the bleu score"""
@@ -164,7 +224,6 @@ class Evaluator(object):
 
 if __name__ == "__main__":
 
-        ev = Evaluator()
     gold_file = open(TEXTCLEANSER_ROOT + 'data/han_dataset/corpus.tweet2')
 
     if len(sys.argv) >= 1:
@@ -173,6 +232,7 @@ if __name__ == "__main__":
         elif os.path.exists(sys.argv[1]):
             gold_file = open(sys.argv[1])
 
+    ev = Evaluator()
     ev.load_gold_standard(gold_file)
 
     ev.get_cleanser_output(rankmethod=Generator.SSK_SIM)
