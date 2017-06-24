@@ -118,7 +118,8 @@ class Decoder:
     def close(self):
         self.stop_ngram_server()
 
-    def pfsg_of_conf_net(self, confusion_net):
+    @staticmethod
+    def pfsg_of_conf_net(confusion_net):
         """
             A word mesh is a more constrained form of a word lattice.
             It follows much more readily given the confusion network input,
@@ -150,7 +151,7 @@ class Decoder:
             @return (stdout,stderr)
         """
 
-        word_mesh = self.pfsg_of_conf_net(confusion_net)
+        word_mesh = Decoder.pfsg_of_conf_net(confusion_net)
 
         if not self.is_running:
             return None, "Server not running"

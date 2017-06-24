@@ -2,9 +2,10 @@ import re
 
 from cleanser import TextCleanser
 from generator import Generator
+import sys
+import os
 
-
-# import cleanse_tweets
+TEXTCLEANSER_ROOT = os.path.split(os.path.realpath(__file__))[0] + os.sep
 
 
 class Evaluator(object):
@@ -13,14 +14,13 @@ class Evaluator(object):
     """
 
     def __init__(self):
-        self.gold_sent_clean = []
-        self.gen = Generator()
         self.cleanser = TextCleanser()
-        gen = self.gen
+        gen = self.cleanser.generator
         cln = self.cleanser
         self.cleanse_methods = {gen.IBM_SIM: cln.ibm_cleanse,
                                 gen.SSK_SIM: cln.ssk_cleanse,
                                 gen.PHONETIC_ED_SIM: cln.phonetic_cleanse}
+        self.gold_sent_clean = []
         self.gold_word_pairs = []
         self.gold_sent_pairs = []
 
@@ -59,7 +59,7 @@ class Evaluator(object):
         """ Log all OOV tokens in gold standard to log file"""
         for (noisy, clean) in self.gold_word_pairs:
             result = self.gen.get_oov(noisy)
-            if result != []:
+            if not result:
                 # write all expanded variants to file
                 oov_file.write(','.join(result) + '\n')
 
@@ -76,8 +76,7 @@ class Evaluator(object):
         if rankmethod in self.cleanse_methods.keys():
             selectormethod = self.cleanse_methods[rankmethod]
         else:
-            print("$rankmethod is not valid.")
-            exit(2)
+            selectormethod = self.cleanse_methods[Generator.SSK_SIM]
 
         if log_replacements:
             repl_log = open('replacements.log', 'w')
@@ -85,10 +84,8 @@ class Evaluator(object):
         if not input:
             input = self.gold_sent_pairs
 
-        n = 0
         for sent_num, sent_in_tok in enumerate(input):
-            print("Processing sentence {}".format(n))
-            n += 1
+            print("Processing sentence {}".format(sent_num))
 
             # reconstruct sentence string, assuming it's in the form [(token 1,
             # gold token 1), ..]
@@ -103,11 +100,8 @@ class Evaluator(object):
                 print("Error: {}".format(error))
                 continue
             print("In: {}\nOut:{}".format(sent_str, sent_clean))
-            sent_clean_tok = sent_clean.split()
             # pack as (original token, cleaned token, gold token)
-            in_out_gold = []
-            for s, c in zip(sent_in_tok, sent_clean_tok):
-                in_out_gold.append((s[0], c, s[1]))
+            in_out_gold = [(s[0], c, s[1]) for s, c in zip(sent_in_tok, sent_clean.split())]
             self.gold_sent_clean.append(in_out_gold)
 
         print("self.gold_sent_clean has {} items".format(len(self.gold_sent_clean)))
@@ -169,13 +163,19 @@ class Evaluator(object):
 
 
 if __name__ == "__main__":
-    print("Evaluator module.")
 
-    for i in [1]:  # can e.g. cycle over rankmethod or other options to compare different parameter settings
         ev = Evaluator()
-        file = open('data/han_dataset/corpus.tweet2')
-        ev.load_gold_standard(file)
-        ev.get_cleanser_output(
-            rankmethod=Generator.SSK_SIM, log_replacements=True)
-        wer = ev.compute_wer()
-        print("WER = {}".format(wer))
+    gold_file = open(TEXTCLEANSER_ROOT + 'data/han_dataset/corpus.tweet2')
+
+    if len(sys.argv) >= 1:
+        if sys.argv[1] == '-':
+            gold_file = sys.stdin
+        elif os.path.exists(sys.argv[1]):
+            gold_file = open(sys.argv[1])
+
+    ev.load_gold_standard(gold_file)
+
+    ev.get_cleanser_output(rankmethod=Generator.SSK_SIM)
+
+    prf = ev.compute_p_r_f(token_norm=lambda t: t.lower())
+    print("PRF = {}".format(prf))

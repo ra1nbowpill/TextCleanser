@@ -157,7 +157,7 @@ def expand_word(noisy_word):
 class StringFunctions:
 
     def __init__(self, lamb, p):
-        self.ssk_cache = shelve.open('ssk_lamb%.2f_p%d_cache' % (lamb, p))
+        self.ssk_cache = shelve.open('ssk_lamb{}_p{}_cache'.format(round(lamb, 2), p))
         self.lamb = lamb
         self.p = p
 
@@ -185,8 +185,8 @@ class StringFunctions:
                 for l in range(2, p + 1):
                     for i in range(len(xi)):
                         for j in range(len(xj)):
-                            dp[i + 1][j + 1] = dps[i][j] + lamb * dp[i][j +
-                                                                        1] + lamb * dp[i + 1][j] - lamb**2 * dp[i][j]
+                            dp[i + 1][j + 1] = dps[i][j] + lamb * dp[i][j + 1]\
+                                               + lamb * dp[i + 1][j] - lamb**2 * dp[i][j]
                             if xi[i] == xj[j]:
                                 dps[i][j] = lamb**2 * dp[i][j]
                                 k[l] = k[l] + dps[i][j]
