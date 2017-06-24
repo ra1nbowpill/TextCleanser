@@ -18,9 +18,9 @@ class Evaluator(object):
         self.cleanser = TextCleanser()
         gen = self.gen
         cln = self.cleanser
-        self.cleanse_methods = {gen.IBM_SIM: cln.heuristic_cleanse,
+        self.cleanse_methods = {gen.IBM_SIM: cln.ibm_cleanse,
                                 gen.SSK_SIM: cln.ssk_cleanse,
-                                gen.PHONETIC_ED_SIM: cln.phonetic_ED_cleanse}
+                                gen.PHONETIC_ED_SIM: cln.phonetic_cleanse}
         self.gold_word_pairs = []
         self.gold_sent_pairs = []
 
