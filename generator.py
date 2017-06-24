@@ -350,6 +350,9 @@ class Generator:
                     r'\1 \2 \3', tok).split(' ') if tok != ''])
         return out_tokens
 
+    def tokenize(self, text):
+        return self.fix_bad_tokenisation(text.split())
+
     def sent_generate_candidates(self, sent, rank_method, off_by_ones=False, log_oov=False):
         """Generate 'confusion set' from a sentence.
             Return (r,w,c) replacements made (smileys), words after tokenisation and confusion set."""
@@ -370,9 +373,7 @@ class Generator:
 
         # split into words
         # TODO: Get a better tokeniser...
-        words = sent.split()
-        # fix bad tokenisation issues
-        words = self.fix_bad_tokenisation(words)
+        words = self.tokenize(sent)
 
         if log_oov:
             confusion_set = [self.get_oov(nw.lower()) for nw in words]

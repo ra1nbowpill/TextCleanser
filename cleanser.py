@@ -24,7 +24,7 @@ class TextCleanser(object):
 
     def _get_replacements(self, cleantext, old_tokens):
         """return the token replacements that were made"""
-        new_tokens = self.generator.fix_bad_tokenisation(cleantext.split())
+        new_tokens = self.generator.tokenize(cleantext)
         # if new_tokens contain more tokens than old_tokens then alignment is
         # screwed
         if len(new_tokens) > len(old_tokens):
