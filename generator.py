@@ -187,12 +187,7 @@ class Generator:
                         heapq.heappush(top_k, (sim, w))
                 cur_w += 1
 
-        # return heapq.nlargest(K, top_k, key=lambda x:x[0])
         conf_set = heapq.nlargest(K - 1, top_k, key=lambda x: x[0])
-        # remove all 0-prob elements
-        for elem in conf_set:
-            if elem[0] == 0:
-                del elem
         return conf_set
 
     def hash_user_rt_url(self, tok):
@@ -219,6 +214,9 @@ class Generator:
         # TODO: Do better detection to catch any token with no letters
         # e.g. "9/11" (dates), "4-4" (scores), etc. and ignore
         # Simple first idea, if it contains _no letters_, ignore
+
+        if len([1 for c in noisy_word if c in "0123456789"]) > 4:
+            return [(1.0, noisy_word)]
 
         if not re.search("[a-z]", noisy_word):
             return [(1.0, noisy_word)]
@@ -330,8 +328,8 @@ class Generator:
 
     def sent_preprocess(self, sent):
         # collapse punctuation marks occurring > 1 into one
-        # rem_dbl_punc = re.compile(r"([{}])\1+".format(pnc))     # remove
-        # punctuation chars repeated > once
+        # rem_dbl_punc = re.compile(r"([{}])\1+".format(pnc))
+        # remove punctuation chars repeated > once
         pass
 
     def fix_bad_tokenisation(self, tokens):
