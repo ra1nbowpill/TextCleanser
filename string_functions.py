@@ -8,6 +8,20 @@ import itertools
 import math
 
 CONSONANTS = "bcdfghjklmnpqrstvwxyz"
+TRANSLIT = {
+    '0': ['0', 'o'],
+    '1': ['1', 'l', 'one'],
+    '2': ['2', 'to', 'two'],
+    '3': ['3', 'e', 'three'],
+    '4': ['4', 'a', 'four', 'for'],
+    '5': ['5', 's', 'five'],
+    '6': ['6', 'six', 'b'],
+    '7': ['7', 't', 'seven'],
+    '8': ['8', 'eight', 'ate'],
+    '9': ['9', 'nine', 'g'],
+    '@': ['@', 'at'],
+    '&': ['&', 'and']
+}
 
 
 def get_first_cons(word):
@@ -118,40 +132,30 @@ def phonetic_ed_sim(s1, s2):
     return math.exp(-(edit_dist(s1, s2)))
 
 
-def expand_word(noisy_word):
-    """
-        Expand 1) transliterate letters 2) ??...
-    """
-    exp_tmp = ['']  # .. and empty candidate strings
-
-    # initialise translit dictionary
-    translit = {
-        '0': ['0', 'o'],
-        '1': ['1', 'l', 'one'],
-        '2': ['2', 'to', 'two'],
-        '3': ['3', 'e', 'three'],
-        '4': ['4', 'a', 'four', 'for'],
-        '5': ['5', 's', 'five'],
-        '6': ['6', 'six', 'b'],
-        '7': ['7', 't', 'seven'],
-        '8': ['8', 'eight', 'ate'],
-        '9': ['9', 'nine', 'g'],
-        '@': ['@', 'at'],
-        '&': ['&', 'and']
-    }
-
-    # generate possible transliterations
+def _need_expand(noisy_word):
     for l in noisy_word:
-        expansions = []
-        try:
-            translits = translit[l]
-        except KeyError:
-            translits = [l]
-        for e in exp_tmp:
-            for c in translits:
-                expansions.append(e + c)
-        exp_tmp = expansions[:]
-    return exp_tmp  # .append(expand_token(noisyWord))
+        if l in TRANSLIT:
+            return True
+    return False
+
+
+def _choose(lst, res):
+    if not lst:
+        return res
+    if not res:
+        return _choose(lst[1:], lst[0])
+    else:
+        return _choose(lst[1:], [p + elt for p in res for elt in lst[0]])
+
+
+def expand_word(noisy_word):
+
+    if not _need_expand(noisy_word):
+        return [noisy_word]
+
+    conf_net = [TRANSLIT[l] if l in TRANSLIT else [l] for l in noisy_word]
+    candidates = _choose(conf_net, [])
+    return candidates
 
 
 class StringFunctions:
