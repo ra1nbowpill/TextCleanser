@@ -169,12 +169,12 @@ class Generator:
         top_k = []    # top K heap of candidate words
 
         cur_w = 0
-        for i, cand_token in enumerate(candidates):
+        for i, cand_token in enumerate(candidates):  # O(candidates)
             # for w in self.lexicon:
             lexicon = lexicon_list[i]
-            for w in lexicon:
+            for w in lexicon:                        # O(nb de mots w[0] == t[0])
                 # if len(w)>=len(cand_token):
-                sim = sim_function(cand_token, w)
+                sim = sim_function(cand_token, w)    # executé (candidat * lexique) fois
                 if sim == 0:      # don't add zero-prob words
                     continue
                 if cur_w < K:        # first K, just insert into heap
@@ -219,84 +219,11 @@ class Generator:
 
         # check for USR or URL or EMPTY_SYM  special tokens
         # noisy=hashTags.sub('hshtg', username.sub('usr', rt.sub('rt', urls.sub('url', noisy))))
-    # @profile
-    def word_generate_candidates(self, noisy_word, rank_method, off_by_ones=False):
-        """Generate a confusion set of possible candidates for a word using some rank_method,
-            currently supported methods include:
-            Generator.IBM_SIM - implementation of the heuristic used in Contractor et al. 2010
-            Generator.SSK_SIM - a 2-char string subsequence similarity function
-            Generator.PHONETIC_ED_SIM - a phonetic edit distance"""
-
-        oov_but_valid = self.check_oov_but_valid(noisy_word)
-        if oov_but_valid:
-            return oov_but_valid
+        if self.hash_user_rt_url(word) or word in [EMPTY_SYM]:
+            return False
 
         # TODO: This seems clumsy, lexicon should include STOPWORDS by default
-        # O(1) for sets
-        if noisy_word not in self.lexicon and noisy_word not in STOPWORDS:
-            # expand noisy word
-            noisy_words = str_fun.expand_word(noisy_word)
-
-            # 1) IBM_SIMILARITY and SUBSEQUENCE-KERNEL SIMILARITY
-            if rank_method in [Generator.IBM_SIM, Generator.SSK_SIM]:
-                first_letters = [str_fun.get_first_cons(w) for w in noisy_words]
-                lexicon = [self.sub_lexicon[first_letter]
-                           for first_letter in first_letters]
-                if rank_method == Generator.IBM_SIM:
-                    sim_function = str_fun.contractor_sim
-                else:
-                    sim_function = self.ssk_sim
-                candidates = noisy_words
-                conf_set = self.rank_candidates(
-                    candidates, lexicon, sim_function, off_by_ones)
-
-            # 2) PHONETIC EDIT DISTANCE SIMILARITY
-            elif rank_method == Generator.PHONETIC_ED_SIM:
-                # candidates=set([self.phon_sim(w)[0] for w in noisy_words])
-                # Include both primary and secondary codes!
-                candidates = []
-                for w in noisy_words:
-                    phonetic_w = self.phon_sim(w)
-                    if phonetic_w[0]:
-                        candidates.append(phonetic_w[0])
-                    if phonetic_w[1]:
-                        candidates.append(phonetic_w[1])
-                # sim_function=self.edit_dist
-                lexicon = [self.phonetic_keys for _ in range(len(candidates))]
-                sim_function = str_fun.phonetic_ed_sim
-                phon_conf_set = self.rank_candidates(
-                    candidates, lexicon, sim_function, off_by_ones)
-                # print("noisy_words: {}".format(noisy_words))
-                # print("phonetic codes: {}".format(candidates))
-                # print("phonetic confusion set: {}".format(phon_conf_set))
-                # expand phonetic codes into their likely candidate words
-                conf_set = []
-                for sim, phonetic_code in phon_conf_set:
-                    conf_set.extend([(sim, w)
-                                     for w in self.phon_lex[phonetic_code]])
-                # retain the top 20
-                conf_set = conf_set[:10]
-
-            else:
-                raise NotImplementedError(
-                    "Unknown rank_method supplied as argument.")
-
-            # heuristic: add original word with same prob as lowest prob word
-            # in case it's a valid OOV word!
-            try:
-                weight = conf_set[-1][0]
-            except IndexError:
-                weight = 1.0        # there's nothing in the confusion set
-            if weight == 0:
-                weight = 0.2        # add original word with some low probability
-            conf_set.append((weight, noisy_word))
-
-            conf_set = [tok for tok in conf_set if tok[0] > 0 and tok[1] != '']
-            if len(conf_set) == 0:
-                conf_set = [(1.0, '*E*')]
-            return conf_set
-
-        else:
+        if word in self.lexicon or word in STOPWORDS:
             # this is a valid word in the lexicon
             # NOTE: This would miss (i) (special case) accidental homophilous misspellings, such as 'rite' and 'right'
             # also (ii) (the general case) spelling errors where a spelling error leads to a valid word in the lexicon
@@ -304,13 +231,20 @@ class Generator:
             # only way to get (ii) is to use a spelling error approach and include all 'off-by-one' errors in the
             # confusion set, e.g. as computed by Norvig's spelling corrector.
             # For (i) need to use phonetic lookup.
-            return [(1.0, noisy_word)]
+            return False
 
-    def get_oov(self, noisy_word):
-        if self.check_oov_but_valid(noisy_word) or noisy_word in self.lexicon or noisy_word in STOPWORDS:
-            return []
-        else:
-            return str_fun.expand_word(noisy_word)
+        # check if it is a common abbreviation or contracted form
+        # TODO: Is this the right place to do this?
+        abbr = self.expand_abbrs(word.strip("'"))
+        if abbr is not None:
+            # TODO: this never replaces lol, etc with EMPTY_SYM after decoding
+            return [(1.0, abbr)]
+
+        return True
+
+    # @profile
+    def word_generate_candidates(self, noisy_word, off_by_ones=False):
+        raise NotImplementedError
 
     def sent_preprocess(self, sent):
         # collapse punctuation marks occurring > 1 into one
@@ -339,7 +273,7 @@ class Generator:
     def tokenize(self, text):
         return self.fix_bad_tokenisation(text.split())
 
-    def sent_generate_candidates(self, sent, rank_method, off_by_ones=False, log_oov=False):
+    def sent_generate_candidates(self, sent, off_by_ones=False, log_oov=False):
         """Generate 'confusion set' from a sentence.
             Return (r,w,c) replacements made (smileys), words after tokenisation and confusion set."""
         # perform some simple pre-processing
@@ -361,15 +295,138 @@ class Generator:
         # TODO: Get a better tokeniser...
         words = self.tokenize(sent)
 
-        if log_oov:
-            confusion_set = [self.get_oov(nw.lower()) for nw in words]
-        else:
-            # get candidates for each word
-            confusion_set = [self.word_generate_candidates(nw.lower(), rank_method, off_by_ones)
-                             for nw in words]
+        # get candidates for each word
+        confusion_set = [self.word_generate_candidates(nw.lower(), off_by_ones)
+                         for nw in words]
 
         return replacements, words, confusion_set
 
+
+class IBMGenerator(Generator):
+    def word_generate_candidates(self, noisy_word, off_by_ones=False):
+        """
+            Generate a confusion set of possible candidates for a word using some rank_method,
+            currently supported methods include:
+            Generator.IBM_SIM - implementation of the heuristic used in Contractor et al. 2010
+        """
+        if not self.need_normalization(noisy_word):
+            return [(1.0, noisy_word)]
+
+        # expand noisy word
+        noisy_words = str_fun.expand_word(noisy_word)
+
+        first_letters = [str_fun.get_first_cons(w) for w in noisy_words]
+        lexicon = [self.sub_lexicon[first_letter]
+                   for first_letter in first_letters]
+
+        candidates = noisy_words
+        conf_set = self.rank_candidates(candidates, lexicon, str_fun.contractor_sim, off_by_ones)
+
+        # heuristic: add original word with same prob as lowest prob word
+        # in case it's a valid OOV word!
+        try:
+            weight = conf_set[-1][0]
+        except IndexError:
+            weight = 1.0  # there's nothing in the confusion set
+        if weight == 0:
+            weight = 0.2  # add original word with some low probability
+        conf_set.append((weight, noisy_word))
+
+        # Removes candidate if prob == 0 or if candidate is ''
+        conf_set = [tok for tok in conf_set if tok[0] > 0 and tok[1] != '']
+        if len(conf_set) == 0:
+            conf_set = [(1.0, '*E*')]
+        return conf_set
+
+
+class SSKGenerator(Generator):
+    def word_generate_candidates(self, noisy_word, off_by_ones=False):
+        """
+            Generate a confusion set of possible candidates for a word using some rank_method,
+            currently supported methods include:
+            Generator.SSK_SIM - a 2-char string subsequence similarity function
+        """
+        if not self.need_normalization(noisy_word):
+            return [(1.0, noisy_word)]
+
+        # expand noisy word
+        noisy_words = str_fun.expand_word(noisy_word)
+
+        first_letters = [str_fun.get_first_cons(w) for w in noisy_words]
+        lexicon = [self.sub_lexicon[first_letter]
+                   for first_letter in first_letters]
+        candidates = noisy_words
+        conf_set = self.rank_candidates(
+            candidates, lexicon, self.ssk_sim, off_by_ones)
+
+        # heuristic: add original word with same prob as lowest prob word
+        # in case it's a valid OOV word!
+        try:
+            weight = conf_set[-1][0]
+        except IndexError:
+            weight = 1.0  # there's nothing in the confusion set
+        if weight == 0:
+            weight = 0.2  # add original word with some low probability
+        conf_set.append((weight, noisy_word))
+
+        # Removes candidate if prob == 0 or if candidate is ''
+        conf_set = [tok for tok in conf_set if tok[0] > 0 and tok[1] != '']
+        if len(conf_set) == 0:
+            conf_set = [(1.0, '*E*')]
+        return conf_set
+
+
+class PhoneticGenerator(Generator):
+    def word_generate_candidates(self, noisy_word, off_by_ones=False):
+        """Generate a confusion set of possible candidates for a word using some rank_method,
+            currently supported methods include:
+            Generator.PHONETIC_ED_SIM - a phonetic edit distance
+        """
+        if not self.need_normalization(noisy_word):
+            return [(1.0, noisy_word)]
+
+
+
+        # expand noisy word
+        noisy_words = str_fun.expand_word(noisy_word)
+
+        # candidates=set([self.phon_sim(w)[0] for w in noisy_words])
+        # Include both primary and secondary codes!
+        candidates = []
+        for w in noisy_words:
+            phonetic_w = self.phon_sim(w)
+            if phonetic_w[0]:
+                candidates.append(phonetic_w[0])
+            if phonetic_w[1]:
+                candidates.append(phonetic_w[1])
+        # sim_function=self.edit_dist
+        lexicon = [self.phonetic_keys for _ in range(len(candidates))]
+        sim_function = str_fun.phonetic_ed_sim
+
+        phon_conf_set = self.rank_candidates(candidates, lexicon, sim_function, off_by_ones)
+
+        # expand phonetic codes into their likely candidate words
+        conf_set = []
+        for sim, phonetic_code in phon_conf_set:
+            conf_set.extend([(sim, w) for w in self.phon_lex[phonetic_code]])
+        # retain the top 20
+        conf_set = conf_set[:10]
+
+        # heuristic: add original word with same prob as lowest prob word
+        # in case it's a valid OOV word!
+        try:
+            weight = conf_set[-1][0]
+        except IndexError:
+            weight = 1.0  # there's nothing in the confusion set
+        if weight == 0:
+            weight = 0.2  # add original word with some low probability
+        conf_set.append((weight, noisy_word))
+
+        # Removes candidate if prob == 0 or if candidate is ''
+        conf_set = [tok for tok in conf_set if tok[0] > 0 and tok[1] != '']
+        if len(conf_set) == 0:
+            conf_set = [(1.0, '*E*')]
+        return conf_set
 
 """
     TODO ideas list:
@@ -387,13 +444,13 @@ if __name__ == "__main__":
     test_confusion_set = [[(0.4, "w1"), (0.6, "w2")],
                           [(0.3, "w3"), (0.3, "w4"), (0.4, "w5")]]
 
-    gen = Generator()
+    gen = IBMGenerator()
 
     for word in testWords:
         # print(gen.expand_word(word))
-        print(gen.word_generate_candidates(word, Generator.PHONETIC_ED_SIM))
+        print(gen.word_generate_candidates(word))
 
     for sent in testSents:
-        _, _, c = gen.sent_generate_candidates(sent, Generator.IBM_SIM)
+        _, _, c = gen.sent_generate_candidates(sent)
         print("Sentence: {}".format(sent))
         print("Candidate list: {}".format(c))
