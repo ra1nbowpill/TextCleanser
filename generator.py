@@ -201,38 +201,24 @@ class Generator:
         else:
             return False
 
-    def check_oov_but_valid(self, noisy_word):
-        # check if it is a common abbreviation or contracted form
-        # TODO: Is this the right place to do this?
-        abbr = self.expand_abbrs(noisy_word.strip("'"))
-        if abbr is not None:
-            # TODO: this never replaces lol, etc with EMPTY_SYM after decoding
-            #            return [(0.8, abbr), (0.2, noisyWord)]
-            return [(1.0, abbr)]
-
+    def need_normalization(self, word):
         # check if it's a number, longer than 1 char
         # TODO: Do better detection to catch any token with no letters
         # e.g. "9/11" (dates), "4-4" (scores), etc. and ignore
         # Simple first idea, if it contains _no letters_, ignore
 
-        if len([1 for c in noisy_word if c in "0123456789"]) > 4:
-            return [(1.0, noisy_word)]
+        if len([1 for c in word if c in "0123456789"]) > 4:
+            return False
 
-        if not re.search("[a-z]", noisy_word):
-            return [(1.0, noisy_word)]
+        if not re.search("[a-z]", word):
+            return False
 
         # check for punctuation
-        if noisy_word in PUNC:
-            return [(1.0, noisy_word)]
+        if word in PUNC:
+            return False
 
         # check for USR or URL or EMPTY_SYM  special tokens
         # noisy=hashTags.sub('hshtg', username.sub('usr', rt.sub('rt', urls.sub('url', noisy))))
-        if self.hash_user_rt_url(noisy_word) or noisy_word in [EMPTY_SYM]:
-            return [(1.0, noisy_word)]
-
-        # otherwise
-        return None
-
     # @profile
     def word_generate_candidates(self, noisy_word, rank_method, off_by_ones=False):
         """Generate a confusion set of possible candidates for a word using some rank_method,
