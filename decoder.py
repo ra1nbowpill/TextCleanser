@@ -36,6 +36,8 @@ class Decoder:
 
         self.is_running = False
 
+        # -output-ctm option for 1 token per line
+        # line.split()[5:6] :: (word, probs)
         self.decode_command = [LATTICE_TOOL_DIR + "lattice-tool", "-in-lattice", "-", "-read-mesh", "-posterior-decode",
                                "-zeroprob-word", "blemish", "-use-server", self.ngram_server_address]
         self.start_server_command = [LATTICE_TOOL_DIR + "ngram", "-lm", LM_DIR + "tweet-lm.gz", "-mix-lm",

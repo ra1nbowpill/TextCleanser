@@ -55,14 +55,6 @@ class Evaluator(object):
             # align, load as pairs
             raise NotImplementedError("No other accessors implemented.")
 
-    def log_oov_from_gold_pairs(self, oov_file):
-        """ Log all OOV tokens in gold standard to log file"""
-        for (noisy, clean) in self.gold_word_pairs:
-            result = self.gen.get_oov(noisy)
-            if not result:
-                # write all expanded variants to file
-                oov_file.write(','.join(result) + '\n')
-
     def log_repl(self, repl_log_f, tweet_id, repl):
         """Log all replacements made to disk"""
         if type(repl) == "list":
