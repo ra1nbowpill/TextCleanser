@@ -11,7 +11,7 @@ import collections
 import csv
 import heapq
 import os
-import pickle as pickle
+import pickle
 import re
 import string
 import sys
@@ -30,7 +30,6 @@ SUB_LEX_FILENAME = TEXTCLEANSER_ROOT + "data/sub_lexicon.pickl"
 STOPWORDS_FILENAME = TEXTCLEANSER_ROOT + "data/stopwords-set.pickl"
 COMMON_ABBR_FILENAME = TEXTCLEANSER_ROOT + "data/common_abbrs.csv"
 
-ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 PUNC = string.punctuation
 STOPWORDS = pickle.load(open(STOPWORDS_FILENAME, "rb"), encoding="UTF-8")
 
@@ -39,12 +38,6 @@ EMPTY_SYM = "EMPTYSYM"
 
 
 class Generator:
-
-    # CLASS CONSTANTS
-    # Candidate word selection methods
-    IBM_SIM = 0
-    SSK_SIM = 1
-    PHONETIC_ED_SIM = 2
 
     def __init__(self, lexicon=None):
 
@@ -306,8 +299,7 @@ class IBMGenerator(Generator):
     def word_generate_candidates(self, noisy_word, off_by_ones=False):
         """
             Generate a confusion set of possible candidates for a word using some rank_method,
-            currently supported methods include:
-            Generator.IBM_SIM - implementation of the heuristic used in Contractor et al. 2010
+            using IBM_SIM - implementation of the heuristic used in Contractor et al. 2010
         """
         if not self.need_normalization(noisy_word):
             return [(1.0, noisy_word)]
@@ -343,8 +335,7 @@ class SSKGenerator(Generator):
     def word_generate_candidates(self, noisy_word, off_by_ones=False):
         """
             Generate a confusion set of possible candidates for a word using some rank_method,
-            currently supported methods include:
-            Generator.SSK_SIM - a 2-char string subsequence similarity function
+            using SSK_SIM - a 2-char string subsequence similarity function
         """
         if not self.need_normalization(noisy_word):
             return [(1.0, noisy_word)]
@@ -355,9 +346,9 @@ class SSKGenerator(Generator):
         first_letters = [str_fun.get_first_cons(w) for w in noisy_words]
         lexicon = [self.sub_lexicon[first_letter]
                    for first_letter in first_letters]
+
         candidates = noisy_words
-        conf_set = self.rank_candidates(
-            candidates, lexicon, self.ssk_sim, off_by_ones)
+        conf_set = self.rank_candidates(candidates, lexicon, self.ssk_sim, off_by_ones)
 
         # heuristic: add original word with same prob as lowest prob word
         # in case it's a valid OOV word!
@@ -379,13 +370,10 @@ class SSKGenerator(Generator):
 class PhoneticGenerator(Generator):
     def word_generate_candidates(self, noisy_word, off_by_ones=False):
         """Generate a confusion set of possible candidates for a word using some rank_method,
-            currently supported methods include:
-            Generator.PHONETIC_ED_SIM - a phonetic edit distance
+            using PHONETIC_ED_SIM - a phonetic edit distance
         """
         if not self.need_normalization(noisy_word):
             return [(1.0, noisy_word)]
-
-
 
         # expand noisy word
         noisy_words = str_fun.expand_word(noisy_word)
@@ -428,8 +416,9 @@ class PhoneticGenerator(Generator):
             conf_set = [(1.0, '*E*')]
         return conf_set
 
+
 """
-    TODO ideas list:
+    TODO list:
     1) pre-process and normalise letters occurring more than 2 consecutive times..
     2) Implement a recaser, using the original sentence as guide for recasing clean sentence
     3) Find suitable heuristic to avoid 'normalising' words which are correct e.g.

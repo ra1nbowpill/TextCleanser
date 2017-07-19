@@ -7,6 +7,7 @@ import shelve
 import itertools
 import math
 
+ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 CONSONANTS = "bcdfghjklmnpqrstvwxyz"
 TRANSLIT = {
     '0': ['0', 'o'],
@@ -132,23 +133,21 @@ def phonetic_ed_sim(s1, s2):
     return math.exp(-(edit_dist(s1, s2)))
 
 
-def _need_expand(noisy_word):
-    for l in noisy_word:
-        if l in TRANSLIT:
-            return True
-    return False
-
-
-def _choose(lst, res):
-    if not lst:
-        return res
-    if not res:
-        return _choose(lst[1:], lst[0])
-    else:
-        return _choose(lst[1:], [p + elt for p in res for elt in lst[0]])
-
-
 def expand_word(noisy_word):
+
+    def _need_expand(noisy_word):
+        for l in noisy_word:
+            if l in TRANSLIT:
+                return True
+        return False
+
+    def _choose(lst, res):
+        if not lst:
+            return res
+        if not res:
+            return _choose(lst[1:], lst[0])
+        else:
+            return _choose(lst[1:], [p + elt for p in res for elt in lst[0]])
 
     if not _need_expand(noisy_word):
         return [noisy_word]
@@ -189,8 +188,7 @@ class StringFunctions:
                 for l in range(2, p + 1):
                     for i in range(len(xi)):
                         for j in range(len(xj)):
-                            dp[i + 1][j + 1] = dps[i][j] + lamb * dp[i][j + 1]\
-                                               + lamb * dp[i + 1][j] - lamb**2 * dp[i][j]
+                            dp[i + 1][j + 1] = dps[i][j] + lamb * dp[i][j + 1] + lamb * dp[i + 1][j] - lamb**2 * dp[i][j]
                             if xi[i] == xj[j]:
                                 dps[i][j] = lamb**2 * dp[i][j]
                                 k[l] = k[l] + dps[i][j]

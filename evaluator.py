@@ -4,9 +4,11 @@ from cleanser import TextCleanser
 from generator import Generator
 import sys
 import os
+import argparse
 
 TEXTCLEANSER_ROOT = os.path.split(os.path.realpath(__file__))[0] + os.sep
 
+CLEANSE_METHODS = ['IBM', 'SSK', 'PHONETIC_ED']
 
 class Evaluator(object):
     """
@@ -15,11 +17,10 @@ class Evaluator(object):
 
     def __init__(self):
         self.cleanser = TextCleanser()
-        gen = self.cleanser.generator
         cln = self.cleanser
-        self.cleanse_methods = {gen.IBM_SIM: cln.ibm_cleanse,
-                                gen.SSK_SIM: cln.ssk_cleanse,
-                                gen.PHONETIC_ED_SIM: cln.phonetic_cleanse}
+        self.cleanse_methods = {'IBM': cln.ibm_cleanse,
+                                'SSK': cln.ssk_cleanse,
+                                'PHONETIC_ED': cln.phonetic_cleanse}
         self.gold_sent_clean = []
         self.gold_word_pairs = []
         self.gold_sent_pairs = []
@@ -86,8 +87,7 @@ class Evaluator(object):
             # gold token 1), ..]
             sent_str = ' '.join([tok_pair[0] for tok_pair in sent_in_tok])
 
-            sent_clean, error, replacements = selectormethod(
-                sent_str, gen_off_by_ones=False)
+            sent_clean, error, replacements = selectormethod(sent_str, gen_off_by_ones=False)
             if log_replacements:
                 self.log_repl(repl_log, sent_num, replacements)
 
@@ -148,7 +148,7 @@ class Evaluator(object):
                 num_incorrect += 1
         return float(num_incorrect) / float(N)
 
-    def compute_p_r_f(self, token_norm=None):
+    def compute_p_r_f(self, token_normalization=None):
         """
             Compute precision, recall and f-score following
             Han et al. "Automatically Constructing a Normalisation Dictionary for Microblogs"
@@ -163,9 +163,9 @@ class Evaluator(object):
 
         for t_i, t_o, t_c in [t for sent in self.gold_sent_clean for t in sent]:
             if token_norm is not None:
-                t_i = token_norm(t_i)
-                t_c = token_norm(t_c)
-                t_o = token_norm(t_o)
+                t_i = token_normalization(t_i)
+                t_c = token_normalization(t_c)
+                t_o = token_normalization(t_o)
 
             must_be_normalized = t_i != t_o
             if must_be_normalized:
@@ -214,9 +214,22 @@ class Evaluator(object):
         pass
 
 
-if __name__ == "__main__":
-
+def main():
     gold_file = open(TEXTCLEANSER_ROOT + 'data/han_dataset/corpus.tweet2')
+
+    def arguments():
+        parser = argparse.ArgumentParser(description='Evaluate TextCleanser')
+        parser.add_argument('-m', '--method', default='IBM', choices=CLEANSE_METHODS, help='Method used to generate candidates')
+        parser.add_argument('FILE', help='Gold file containing raw tokens and normalised tokens. The format is :\n'
+                                         '<Num of tweets tokens>\n'
+                                         '<input 1>   <norm 1>\n'
+                                         '<input 2>   <norm 2>\n'
+                                         '.....\n'
+                                         '\n'
+                                         '.....')
+        return parser.parse_args()
+
+    args = arguments()
 
     if len(sys.argv) >= 1:
         if sys.argv[1] == '-':
@@ -227,7 +240,11 @@ if __name__ == "__main__":
     ev = Evaluator()
     ev.load_gold_standard(gold_file)
 
-    ev.get_cleanser_output(rankmethod=Generator.SSK_SIM)
+    ev.get_cleanser_output(rankmethod=args.method)
 
-    prf = ev.compute_p_r_f(token_norm=lambda t: t.lower())
+    prf = ev.compute_p_r_f(token_normalization=lambda t: t.lower())
     print("PRF = {}".format(prf))
+
+
+if __name__ == "__main__":
+    main()
